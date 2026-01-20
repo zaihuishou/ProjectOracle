@@ -33,10 +33,11 @@ class Scanner:
     
     SENSITIVE_DIRS = ['.aws/', '.ssh/', '.gnupg/', 'credentials/']
     
-    def __init__(self, root_path: str, max_files: int = 5000, workers: int = 4):
+    def __init__(self, root_path: str, max_files: int = 5000, workers: int = 4, language: str = 'auto'):
         self.root_path = Path(root_path).resolve()
         self.max_files = max_files
         self.workers = workers
+        self.language = language
         self.gitignore_spec = self._load_gitignore()
         self.ignore_spec = self._merge_ignore_rules()
     
@@ -135,13 +136,28 @@ class Scanner:
         
         return DirectoryTree(root=root_node, depth=max_depth, total_files=total_files)
     
-    def get_scannable_files(self, extensions: list[str]) -> dict:
+    def get_scannable_files(self, extensions: list[str] = None) -> dict:
         """
         Get list of files to analyze.
         
+        Args:
+            extensions: List of file extensions (e.g., ['.py', '.java'])
+                       If None, auto-detect language and use appropriate extensions
+        
         Returns:
-            dict with keys: files, strategy, total_found, included
+            dict with keys: files, strategy, total_found, included, language
         """
+        # Auto-detect language if extensions not specified
+        detected_language = None
+        if extensions is None:
+            from .language_detector import LanguageDetector
+            detected_language = LanguageDetector.detect(self.root_path)
+            extensions = LanguageDetector.get_extensions(detected_language)
+            
+            if not extensions:
+                # Fallback to all code extensions
+                extensions = LanguageDetector.get_all_code_extensions()
+        
         all_files = []
         
         # Discovery phase
@@ -185,7 +201,8 @@ class Scanner:
                 "files": all_files,
                 "strategy": "full",
                 "total_found": total_found,
-                "included": total_found
+                "included": total_found,
+                "language": detected_language or 'unknown'
             }
         else:
             # Prioritize and sample
@@ -200,7 +217,8 @@ class Scanner:
                 "files": sampled,
                 "strategy": "sampled",
                 "total_found": total_found,
-                "included": len(sampled)
+                "included": len(sampled),
+                "language": detected_language or 'unknown'
             }
     
     def _prioritize_files(self, files: list[Path]) -> list[Path]:
