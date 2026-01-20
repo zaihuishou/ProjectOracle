@@ -126,7 +126,7 @@ class OpenAIProvider(BaseLLMProvider):
 class GoogleGeminiProvider(BaseLLMProvider):
     """Google Gemini provider (has free tier)."""
     
-    def __init__(self, api_key: str, model: str = "gemini-1.5-pro-latest"):
+    def __init__(self, api_key: str, model: str = "gemini-1.5-pro"):
         self.model = model
         # Pricing varies, using estimates or free tier
         self.input_price_per_1k = 0.00  # Often free for low usage
