@@ -27,8 +27,9 @@ class Scanner:
     
     SENSITIVE_PATTERNS = [
         '.env', '.env.*', '*.env',
-        '*secret*', '*password*', '*credential*', '*key*',
-        'id_rsa', '*.pem', '*.key', '*.crt', '*.p12', '*.jks'
+        'id_rsa', 'id_dsa', 
+        '*.pem', '*.key', '*.crt', '*.p12', '*.jks', '*.keystore',
+        'secrets.json', 'client_secrets.json', 'credentials.json'
     ]
     
     SENSITIVE_DIRS = ['.aws/', '.ssh/', '.gnupg/', 'credentials/']
