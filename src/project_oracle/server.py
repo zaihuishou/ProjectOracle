@@ -7,7 +7,12 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent
+from mcp.types import Tool, TextContent, Resource, ResourceTemplate
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+
+# Global state for active project (for Resources)
+active_project_path: Optional[Path] = None
 
 from .core import Scanner, PythonParser, OracleEngine, ConfigManager
 from .utils import logger, setup_logging
@@ -45,12 +50,83 @@ async def list_tools() -> list[Tool]:
                         "type": "boolean",
                         "description": "Preview cost without analyzing",
                         "default": False
+                    },
+                    "llm_provider": {
+                        "type": "string",
+                        "description": "LLM Provider (anthropic, openai, gemini, ollama)",
+                        "enum": ["anthropic", "openai", "gemini", "ollama", "auto"],
+                        "default": "auto"
+                    },
+                    "llm_model": {
+                        "type": "string",
+                        "description": "Specific model name (e.g. gpt-4o, gemini-1.5-pro)",
+                    },
+                    "api_key": {
+                        "type": "string",
+                        "description": "API Key (optional, defaults to env vars)"
                     }
                 },
                 "required": ["path"]
             }
         )
+            }
+        )
     ]
+
+
+@app.list_resources()
+async def list_resources() -> list[Resource]:
+    """List available resources (files in active project)."""
+    global active_project_path
+    
+    if not active_project_path:
+        return []
+    
+    # Use scanner to find files
+    scanner = Scanner(str(active_project_path))
+    files_info = scanner.get_scannable_files(extensions=None)
+    
+    resources = []
+    for file_path in files_info['files']:
+        try:
+            rel_path = file_path.relative_to(active_project_path)
+            uri = f"project:///{rel_path}"
+            
+            resources.append(Resource(
+                uri=uri,
+                name=str(rel_path),
+                mimeType="text/plain"  # Simplified, could detect based on extension
+            ))
+        except Exception as e:
+            logger.warning(f"Skipping resource {file_path}: {e}")
+            continue
+    
+    return resources
+
+
+@app.read_resource()
+async def read_resource(uri: str) -> str:
+    """Read resource content."""
+    global active_project_path
+    
+    if not active_project_path:
+        raise ValueError("No active project. Run analyze_project tool first to set context.")
+    
+    if not uri.startswith("project:///"):
+        raise ValueError(f"Invalid URI scheme: {uri}")
+    
+    rel_path_str = uri.replace("project:///", "")
+    file_path = active_project_path / rel_path_str
+    
+    if not file_path.exists():
+        raise ValueError(f"File not found: {file_path}")
+    
+    # Use GenericParser to read content safely
+    from .core import GenericParser
+    parser = GenericParser(str(active_project_path))
+    content = parser.extract(file_path)
+    
+    return content.content
 
 
 @app.call_tool()
@@ -59,11 +135,17 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
     if name != "analyze_project":
         raise ValueError(f"Unknown tool: {name}")
     
+    global active_project_path
+    
     # Extract arguments
     project_path = Path(arguments["path"])
+    active_project_path = project_path  # Set as active context for Resources
     force = arguments.get("force", False)
     max_files = arguments.get("max_files", 5000)
     dry_run = arguments.get("dry_run", False)
+    llm_provider = arguments.get("llm_provider", "auto")
+    llm_model = arguments.get("llm_model")
+    api_key = arguments.get("api_key")
     
     if not project_path.exists():
         return [TextContent(
@@ -76,9 +158,13 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         result = await asyncio.to_thread(
             analyze_project_sync,
             project_path,
+            project_path,
             force,
             max_files,
-            dry_run
+            dry_run,
+            llm_provider,
+            llm_model,
+            api_key
         )
         
         return [TextContent(type="text", text=result)]
@@ -95,7 +181,10 @@ def analyze_project_sync(
     project_path: Path,
     force: bool,
     max_files: int,
-    dry_run: bool
+    dry_run: bool,
+    llm_provider: str = "auto",
+    llm_model: str = None,
+    api_key: str = None
 ) -> str:
     """Synchronous project analysis (runs in thread)."""
     
@@ -114,18 +203,27 @@ def analyze_project_sync(
         workers=config["scan"]["workers"]
     )
     
-    parser = PythonParser(str(project_path))
+    # Select parser based on language (reusing logic from CLI/LanguageDetector if desired, 
+    # but for now we keep PythonParser as default or rely on OracleEngine to handle generic content if needed.
+    # To fully support multi-lang in server, we should align with CLI logic.)
+    from .core import LanguageDetector, GenericParser
+    detected_lang = LanguageDetector.detect(project_path)
     
-    # Get API key and create provider
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        # Try scan-only mode if no API key
-        logger.warning("No ANTHROPIC_API_KEY found, using scan-only mode")
-        from .core.llm_providers import NoLLMProvider
-        provider = NoLLMProvider()
+    if detected_lang == 'python':
+        parser = PythonParser(str(project_path))
     else:
-        from .core.llm_providers import AnthropicProvider
-        provider = AnthropicProvider(api_key=api_key)
+        parser = GenericParser(str(project_path))
+    
+    # Create LLM provider
+    provider = create_provider(
+        provider_name=llm_provider if llm_provider != "auto" else None,
+        api_key=api_key,
+        model=llm_model
+    )
+    
+    # If using NoLLMProvider (scan-only), warn if user expected AI
+    if provider.name == "No LLM (Scan Only)":
+        logger.warning("Using NoLLMProvider. Set API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY) for AI analysis.")
     
     engine = OracleEngine(
         provider=provider,
