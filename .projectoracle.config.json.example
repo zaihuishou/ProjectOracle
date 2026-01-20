@@ -1,0 +1,39 @@
+"""Example configuration file for ProjectOracle.
+
+Place this file as .projectoracle.config.json in your project root.
+"""
+
+{
+  "version": "1.0",
+  "scan": {
+    "max_files": 5000,
+    "max_depth": 4,
+    "max_file_size_kb": 500,
+    "scan_timeout_seconds": 300,
+    "follow_symlinks": false,
+    "workers": 4,
+    "custom_ignore_patterns": []
+  },
+  "analysis": {
+    "include_tests": false,
+    "detect_fragile_points": true,
+    "generate_mermaid": true
+  },
+  "llm": {
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet-20241022",
+    "max_input_tokens": 8000,
+    "max_cost_usd": 0.50,
+    "timeout_seconds": 30,
+    "retry_attempts": 1
+  },
+  "output": {
+    "backup_enabled": true,
+    "diff_threshold_percent": 20,
+    "keep_history": 5,
+    "atomic_write": true
+  },
+  "security": {
+    "scan_for_secrets": false
+  }
+}

@@ -1,0 +1,12 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CONTRIBUTING.md
+include INSTALL.md
+include pyproject.toml
+include .projectoracle.config.json.example
+
+recursive-include src *.py
+recursive-exclude tests *
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
