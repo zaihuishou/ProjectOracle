@@ -123,6 +123,48 @@ class OpenAIProvider(BaseLLMProvider):
         return "OpenAI GPT-4"
 
 
+class GoogleGeminiProvider(BaseLLMProvider):
+    """Google Gemini provider (has free tier)."""
+    
+    def __init__(self, api_key: str, model: str = "gemini-1.5-pro-latest"):
+        self.model = model
+        # Pricing varies, using estimates or free tier
+        self.input_price_per_1k = 0.00  # Often free for low usage
+        self.output_price_per_1k = 0.00
+        
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            self.client = genai
+        except ImportError:
+            raise ImportError("google-generativeai package required. Install with: pip install google-generativeai")
+    
+    def analyze(self, prompt: str, max_tokens: int = 4000) -> str:
+        """Analyze using Gemini."""
+        try:
+            model = self.client.GenerativeModel(self.model)
+            response = model.generate_content(
+                prompt,
+                generation_config=self.client.types.GenerationConfig(
+                    max_output_tokens=max_tokens,
+                    temperature=0.3
+                )
+            )
+            return response.text
+        except Exception as e:
+            logger.error(f"Gemini API error: {e}")
+            raise
+    
+    def estimate_cost(self, input_tokens: int, output_tokens: int = 2000) -> float:
+        """Estimate Gemini cost (often free)."""
+        # Simplify for now as pricing is complex/often free
+        return 0.0
+    
+    @property
+    def name(self) -> str:
+        return f"Google Gemini ({self.model})"
+
+
 class OllamaProvider(BaseLLMProvider):
     """Ollama local LLM provider (FREE)."""
     
@@ -218,6 +260,11 @@ def create_provider(
             raise ValueError("OPENAI_API_KEY required for OpenAI provider")
         return OpenAIProvider(api_key=api_key, model=model or "gpt-4-turbo-preview")
     
+    elif provider_name == "gemini":
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY required for Gemini provider")
+        return GoogleGeminiProvider(api_key=api_key, model=model or "gemini-1.5-pro-latest")
+    
     elif provider_name == "ollama":
         return OllamaProvider(
             model=model or "llama2",
@@ -230,5 +277,5 @@ def create_provider(
     else:
         raise ValueError(
             f"Unknown provider: {provider_name}. "
-            f"Must be one of: anthropic, openai, ollama, none"
+            f"Must be one of: anthropic, openai, gemini, ollama, none"
         )
