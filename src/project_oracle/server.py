@@ -22,6 +22,9 @@ from .utils import logger, setup_logging
 # Initialize MCP server
 app = Server("project-oracle")
 
+# Setup logging
+setup_logging(level="DEBUG")
+
 
 @app.list_tools()
 async def list_tools() -> list[Tool]:
