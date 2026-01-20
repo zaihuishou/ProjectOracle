@@ -138,10 +138,17 @@ Select AI provider [3]:
 
 ## 📄 查看报告
 
-分析完成后，报告保存在项目根目录的 `.ProjectOracle` 文件中：
+分析完成后，报告保存在项目根目录的 `.ProjectOracle/` 文件夹中：
 
 ```bash
-cat /path/to/your/project/.ProjectOracle
+# 报告位置
+/path/to/your/project/.ProjectOracle/{项目名}_analysis.md
+
+# 示例：对于项目 yuu
+cat /path/to/yuu/.ProjectOracle/yuu_analysis.md
+
+# 示例：对于项目 ProjectOracle
+cat /path/to/ProjectOracle/.ProjectOracle/ProjectOracle_analysis.md
 ```
 
 报告包含：
