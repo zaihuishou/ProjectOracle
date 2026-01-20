@@ -116,12 +116,19 @@ def analyze_project_sync(
     
     parser = PythonParser(str(project_path))
     
+    # Get API key and create provider
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        return "Error: ANTHROPIC_API_KEY environment variable not set"
+        # Try scan-only mode if no API key
+        logger.warning("No ANTHROPIC_API_KEY found, using scan-only mode")
+        from .core.llm_providers import NoLLMProvider
+        provider = NoLLMProvider()
+    else:
+        from .core.llm_providers import AnthropicProvider
+        provider = AnthropicProvider(api_key=api_key)
     
     engine = OracleEngine(
-        api_key=api_key,
+        provider=provider,
         max_cost_usd=config["llm"]["max_cost_usd"]
     )
     

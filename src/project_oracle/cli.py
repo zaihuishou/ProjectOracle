@@ -158,10 +158,10 @@ def main(project_path, interactive, scan_only, llm_provider, llm_model,
         entry_content = ""
         if entry_files:
             try:
-                with open(entry_files[0], 'r') as f:
+                with open(entry_files[0], 'r', encoding='utf-8') as f:
                     entry_content = f.read()
-            except:
-                pass
+            except (IOError, UnicodeDecodeError) as e:
+                logger.warning(f"Failed to read entry point {entry_files[0]}: {e}")
         
         # Collect uncertain imports
         uncertain = set()
