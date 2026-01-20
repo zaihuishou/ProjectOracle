@@ -14,6 +14,46 @@
 
 ## 🚀 快速开始
 
+### Standard MCP Features
+
+ProjectOracle fully implements the [Model Context Protocol](https://modelcontextprotocol.io/):
+
+#### 🛠️ Tools
+- `analyze_project`: Analyze codebase with specific LLM provider
+  - Arguments: `path`, `llm_provider`, `llm_model`, `force`, `dry_run`
+
+#### 📂 Resources
+- `project:///{path}`: Read any file in the analyzed project
+- **List Resources**: Automatically lists all project files
+
+#### 💬 Prompts
+- `analyze-architecture`: Guided architecture analysis
+- `security-audit`: Security vulnerability assessment
+
+#### 🤖 Multi-Provider Support
+Configure via environment variables or arguments:
+- **Anthropic**: `ANTHROPIC_API_KEY` (Default)
+- **OpenAI**: `OPENAI_API_KEY`
+- **Gemini**: `GEMINI_API_KEY`
+
+Example MCP Config (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "project-oracle": {
+      "command": "uvx",
+      "args": ["project-oracle"],
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-...",
+        "OPENAI_API_KEY": "sk-...",
+        "GEMINI_API_KEY": "AI..."
+      }
+    }
+  }
+}
+```
+
 ### 安装
 
 ```bash
