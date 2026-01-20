@@ -248,9 +248,30 @@ def create_provider(
     Raises:
         ValueError: If provider name is invalid or required parameters missing
     """
+    if not provider_name or provider_name.lower() == "auto":
+        # Auto-detect from environment variables
+        import os
+        if os.getenv("ANTHROPIC_API_KEY"):
+            provider_name = "anthropic"
+            api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+        elif os.getenv("OPENAI_API_KEY"):
+            provider_name = "openai"
+            api_key = api_key or os.getenv("OPENAI_API_KEY")
+        elif os.getenv("GEMINI_API_KEY"):
+            provider_name = "gemini"
+            api_key = api_key or os.getenv("GEMINI_API_KEY")
+        else:
+            # Fallback to scan-only if no keys found
+            provider_name = "none"
+
     provider_name = provider_name.lower()
     
     if provider_name == "anthropic":
+        if not api_key:
+            # Try to fetch from env if not provided
+            import os
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            
         if not api_key:
             raise ValueError("ANTHROPIC_API_KEY required for Anthropic provider")
         return AnthropicProvider(api_key=api_key, model=model or "claude-3-5-sonnet-20241022")
