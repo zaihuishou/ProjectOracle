@@ -198,7 +198,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
     force = arguments.get("force", False)
     max_files = arguments.get("max_files", 5000)
     dry_run = arguments.get("dry_run", False)
-    llm_provider = arguments.get("llm_provider", "auto")
+    llm_provider = arguments.get("llm_provider") or "auto"
     llm_model = arguments.get("llm_model")
     api_key = arguments.get("api_key")
     
