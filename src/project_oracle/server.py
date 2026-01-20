@@ -190,8 +190,16 @@ def analyze_project_sync(
     logger.info("Generating report...")
     report = engine.generate_report(analysis, stats, project_path.name)
     
-    # Create .ProjectOracle folder
+    # Create .ProjectOracle folder (handle migration from old file format)
     output_dir = project_path / ".ProjectOracle"
+    
+    # If .ProjectOracle is a file instead of folder, backup and remove it
+    if output_dir.exists() and output_dir.is_file():
+        old_file_backup = project_path / ".ProjectOracle.old"
+        output_dir.rename(old_file_backup)
+        logger.info(f"Migrated old report to: {old_file_backup}")
+    
+    # Create folder
     output_dir.mkdir(exist_ok=True)
     
     # Generate report filename: project_name_analysis.md (use resolve().name for actual dir name)

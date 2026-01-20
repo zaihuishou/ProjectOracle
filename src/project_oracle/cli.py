@@ -220,8 +220,16 @@ def main(project_path, force, max_files, verbose):
         
         report = engine.generate_report(analysis, report_stats, project_path.name)
         
-        # 创建 .ProjectOracle 文件夹
+        # 创建 .ProjectOracle 文件夹（处理旧版本的文件迁移）
         output_dir = project_path / ".ProjectOracle"
+        
+        # 如果 .ProjectOracle 是文件而不是文件夹，先备份并删除
+        if output_dir.exists() and output_dir.is_file():
+            old_file_backup = project_path / ".ProjectOracle.old"
+            output_dir.rename(old_file_backup)
+            click.echo(f"  📦 Migrated old report to: {old_file_backup.name}")
+        
+        # 创建文件夹
         output_dir.mkdir(exist_ok=True)
         
         # 生成报告文件名: 项目名_analysis.md (使用resolve().name获取实际目录名)
