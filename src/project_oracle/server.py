@@ -69,8 +69,6 @@ async def list_tools() -> list[Tool]:
                 "required": ["path"]
             }
         )
-            }
-        )
     ]
 
 
