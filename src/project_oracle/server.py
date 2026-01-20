@@ -190,12 +190,17 @@ def analyze_project_sync(
     logger.info("Generating report...")
     report = engine.generate_report(analysis, stats, project_path.name)
     
-    # Write to file
-    output_path = project_path / ".ProjectOracle"
+    # Create .ProjectOracle folder
+    output_dir = project_path / ".ProjectOracle"
+    output_dir.mkdir(exist_ok=True)
+    
+    # Generate report filename: project_name_analysis.md
+    report_filename = f"{project_path.name}_analysis.md"
+    output_path = output_dir / report_filename
     
     # Backup if exists
     if output_path.exists() and not force:
-        backup_path = project_path / ".ProjectOracle.backup"
+        backup_path = output_dir / f"{project_path.name}_analysis.backup.md"
         output_path.rename(backup_path)
     
     output_path.write_text(report, encoding='utf-8')
