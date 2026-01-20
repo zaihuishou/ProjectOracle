@@ -10,29 +10,78 @@ class LanguageDetector:
     
     # Language to file extensions mapping
     LANGUAGE_EXTENSIONS: Dict[str, List[str]] = {
-        'python': ['.py', '.pyw', '.pyx'],
+        # Mainstream languages
+        'python': ['.py', '.pyw', '.pyx', '.pyi'],
         'java': ['.java'],
         'kotlin': ['.kt', '.kts'],
-        'javascript': ['.js', '.jsx', '.mjs'],
-        'typescript': ['.ts', '.tsx'],
+        'javascript': ['.js', '.jsx', '.mjs', '.cjs'],
+        'typescript': ['.ts', '.tsx', '.mts', '.cts'],
         'go': ['.go'],
         'rust': ['.rs'],
-        'c++': ['.cpp', '.cc', '.cxx', '.hpp', '.h', '.hxx'],
+        'c++': ['.cpp', '.cc', '.cxx', '.hpp', '.h', '.hxx', '.hh'],
         'c': ['.c', '.h'],
-        'c#': ['.cs'],
-        'ruby': ['.rb'],
-        'php': ['.php'],
+        'c#': ['.cs', '.csx'],
+        'ruby': ['.rb', '.rake', '.gemspec'],
+        'php': ['.php', '.phtml', '.php3', '.php4', '.php5'],
         'swift': ['.swift'],
-        'objective-c': ['.m', '.mm'],
-        'scala': ['.scala'],
-        'r': ['.r', '.R'],
-        'perl': ['.pl', '.pm'],
-        'lua': ['.lua'],
-        'dart': ['.dart'],
+        'objective-c': ['.m', '.mm', '.h'],
+        'scala': ['.scala', '.sc'],
+        
+        # Functional languages
+        'haskell': ['.hs', '.lhs'],
+        'clojure': ['.clj', '.cljs', '.cljc', '.edn'],
         'elixir': ['.ex', '.exs'],
-        'haskell': ['.hs'],
-        'clojure': ['.clj', '.cljs'],
-        'shell': ['.sh', '.bash', '.zsh'],
+        'erlang': ['.erl', '.hrl'],
+        'ocaml': ['.ml', '.mli'],
+        'f#': ['.fs', '.fsi', '.fsx'],
+        
+        # JVM languages
+        'groovy': ['.groovy', '.gvy'],
+        
+        # Scripting languages
+        'perl': ['.pl', '.pm', '.t'],
+        'lua': ['.lua'],
+        'shell': ['.sh', '.bash', '.zsh', '.fish'],
+        'powershell': ['.ps1', '.psm1', '.psd1'],
+        'r': ['.r', '.R', '.rmd'],
+        
+        # Web languages
+        'html': ['.html', '.htm'],
+        'css': ['.css', '.scss', '.sass', '.less'],
+        'vue': ['.vue'],
+        'svelte': ['.svelte'],
+        
+        # Mobile
+        'dart': ['.dart'],
+        
+        # Systems programming
+        'zig': ['.zig'],
+        'nim': ['.nim'],
+        'crystal': ['.cr'],
+        'v': ['.v'],
+        
+        # Data & ML
+        'julia': ['.jl'],
+        'matlab': ['.m'],
+        'sql': ['.sql'],
+        
+        # Modern languages
+        'solidity': ['.sol'],  # Blockchain
+        'move': ['.move'],  # Blockchain
+        'cairo': ['.cairo'],  # Blockchain
+        
+        # Configuration & markup
+        'yaml': ['.yaml', '.yml'],
+        'json': ['.json'],
+        'toml': ['.toml'],
+        'xml': ['.xml'],
+        
+        # Other
+        'assembly': ['.asm', '.s'],
+        'fortran': ['.f', '.f90', '.f95'],
+        'cobol': ['.cob', '.cbl'],
+        'pascal': ['.pas'],
+        'ada': ['.ada', '.adb', '.ads'],
     }
     
     # Extension to language reverse mapping
@@ -171,6 +220,7 @@ class LanguageDetector:
     def get_language_display_name(cls, language: str) -> str:
         """Get human-readable language name."""
         display_names = {
+            # Mainstream
             'python': 'Python',
             'java': 'Java',
             'kotlin': 'Kotlin',
@@ -186,14 +236,52 @@ class LanguageDetector:
             'swift': 'Swift',
             'objective-c': 'Objective-C',
             'scala': 'Scala',
+            # Functional
+            'haskell': 'Haskell',
+            'clojure': 'Clojure',
+            'elixir': 'Elixir',
+            'erlang': 'Erlang',
+            'ocaml': 'OCaml',
+            'f#': 'F#',
+            # JVM
+            'groovy': 'Groovy',
+            # Scripting
             'r': 'R',
             'perl': 'Perl',
             'lua': 'Lua',
-            'dart': 'Dart',
-            'elixir': 'Elixir',
-            'haskell': 'Haskell',
-            'clojure': 'Clojure',
             'shell': 'Shell',
+            'powershell': 'PowerShell',
+            # Web
+            'html': 'HTML',
+            'css': 'CSS',
+            'vue': 'Vue',
+            'svelte': 'Svelte',
+            # Mobile
+            'dart': 'Dart',
+            # Systems
+            'zig': 'Zig',
+            'nim': 'Nim',
+            'crystal': 'Crystal',
+            'v': 'V',
+            # Data & ML
+            'julia': 'Julia',
+            'matlab': 'MATLAB',
+            'sql': 'SQL',
+            # Blockchain
+            'solidity': 'Solidity',
+            'move': 'Move',
+            'cairo': 'Cairo',
+            # Config
+            'yaml': 'YAML',
+            'json': 'JSON',
+            'toml': 'TOML',
+            'xml': 'XML',
+            # Other
+            'assembly': 'Assembly',
+            'fortran': 'Fortran',
+            'cobol': 'COBOL',
+            'pascal': 'Pascal',
+            'ada': 'Ada',
             'unknown': 'Unknown',
         }
         return display_names.get(language, language.title())

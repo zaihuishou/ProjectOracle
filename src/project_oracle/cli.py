@@ -6,7 +6,7 @@ from pathlib import Path
 
 import click
 
-from .core import Scanner, PythonParser, OracleEngine, ConfigManager
+from .core import Scanner, PythonParser, OracleEngine, ConfigManager, GenericParser, LanguageDetector
 from .core.llm_providers import create_provider
 from .utils import logger, setup_logging
 
@@ -119,19 +119,23 @@ def main(project_path, force, max_files, verbose):
         "scan": {"max_files": max_files}
     })
     
-    # 初始化组件
+    # Detect language
+    detected_language = LanguageDetector.detect(project_path)
+    language_display = LanguageDetector.get_language_display_name(detected_language)
+    
+    # Initialize components
     click.echo("\n🔍 Scanning project...\n")
+    click.echo(f"📝 Detected language: {language_display}")
     
     scanner = Scanner(
         str(project_path),
         max_files=config["scan"]["max_files"],
         workers=config["scan"]["workers"]
     )
+    # Get scan statistics
+    stats = scanner.get_scan_stats(extensions=None)  # Auto-detect extensions
     
-    # 获取扫描统计
-    stats = scanner.get_scan_stats(extensions=['.py'])
-    
-    click.echo(f"📊 Scan Results:")
+    click.echo(f"\n📊 Scan Results:")
     click.echo(f"  • Total files found: {stats.total_files:,}")
     click.echo(f"  • Files to analyze: {stats.included_files:,}")
     click.echo(f"  • Strategy: {stats.strategy}")
@@ -141,27 +145,45 @@ def main(project_path, force, max_files, verbose):
             click.echo("Cancelled.")
             return
     
-    # 运行分析
+    # Run analysis
     click.echo("\n🚀 Starting analysis...\n")
     
     try:
-        # 扫描和提取
-        parser = PythonParser(str(project_path))
+        # Scan and extract based on language
         tree = scanner.get_directory_tree(max_depth=4)
-        files_info = scanner.get_scannable_files(['.py'])
+        files_info = scanner.get_scannable_files(extensions=None)  # Auto-detect
         
         click.echo(f"📝 Extracting symbols from {len(files_info['files'])} files...")
         
-        symbols = {}
-        total_classes = 0
-        total_functions = 0
-        
-        with click.progressbar(files_info['files'][:100], label='Processing') as files:
-            for file_path in files:
-                symbol_data = parser.extract(file_path)
-                symbols[str(file_path)] = symbol_data
-                total_classes += len(symbol_data.classes)
-                total_functions += len(symbol_data.functions)
+        # Use appropriate parser based on language
+        if detected_language == 'python':
+            # Use Python AST parser
+            parser = PythonParser(str(project_path))
+            symbols = {}
+            total_classes = 0
+            total_functions = 0
+            
+            with click.progressbar(files_info['files'][:100], label='Processing') as files:
+                for file_path in files:
+                    symbol_data = parser.extract(file_path)
+                    symbols[str(file_path)] = symbol_data
+                    total_classes += len(symbol_data.classes)
+                    total_functions += len(symbol_data.functions)
+        else:
+            # Use generic parser for other languages
+            parser = GenericParser(str(project_path))
+            file_contents = {}
+            
+            with click.progressbar(files_info['files'][:100], label='Processing') as files:
+                for file_path in files:
+                    content = parser.extract(file_path)
+                    file_contents[content.path] = content
+            
+            # For non-Python, we don't have class/function counts from AST
+            # Let AI analyze the code structure
+            symbols = file_contents
+            total_classes = 0
+            total_functions = 0
         
         # 获取入口点
         entry_files = [f for f in files_info['files'] if f.name in ['main.py', 'app.py', '__main__.py']]
