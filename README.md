@@ -29,11 +29,24 @@ pip install -e .
 
 ### 使用
 
+**重要**: 每次使用前需要激活虚拟环境！
+
 ```bash
+# 1. 进入项目目录
+cd ProjectOracle
+
+# 2. 激活虚拟环境
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# 3. 运行分析
 project-oracle /path/to/your/project
 ```
 
-运行后会看到交互式界面，引导您完成分析。
+或者使用Python模块方式（不需要激活虚拟环境）：
+
+```bash
+python3 -m project_oracle.cli /path/to/your/project
+```
 
 ---
 
@@ -192,6 +205,34 @@ project-oracle /path/to/project --verbose
 
 ---
 
+## ❓ 常见问题
+
+### Q: 命令找不到 `project-oracle: command not found`
+
+**解决方法**:
+
+1. 确保激活了虚拟环境:
+   ```bash
+   source venv/bin/activate
+   ```
+
+2. 或使用Python模块方式:
+   ```bash
+   python3 -m project_oracle.cli /path/to/project
+   ```
+
+### Q: 如何退出虚拟环境？
+
+```bash
+deactivate
+```
+
+### Q: 可以全局安装吗？
+
+可以，但不推荐。建议使用虚拟环境以避免依赖冲突。
+
+---
+
 ## 📚 更多信息
 
 - [安装指南](INSTALL.md)
@@ -207,4 +248,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ---
 
-**立即开始**: `project-oracle .`
+**快速开始**: 
+```bash
+source venv/bin/activate && project-oracle .
+```
