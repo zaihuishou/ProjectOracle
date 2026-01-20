@@ -158,6 +158,8 @@ class Scanner:
             if not extensions:
                 # Fallback to all code extensions
                 extensions = LanguageDetector.get_all_code_extensions()
+            
+            logger.debug(f"Scanner detected language: {detected_language}, Extensions: {extensions}")
         
         all_files = []
         
