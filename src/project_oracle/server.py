@@ -15,6 +15,7 @@ from mcp.server.stdio import stdio_server
 active_project_path: Optional[Path] = None
 
 from .core import Scanner, PythonParser, OracleEngine, ConfigManager
+from .core.llm_providers import create_provider
 from .utils import logger, setup_logging
 
 
