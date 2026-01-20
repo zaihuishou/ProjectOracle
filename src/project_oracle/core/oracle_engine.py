@@ -96,6 +96,33 @@ class OracleEngine:
         total_classes = sum(len(s.classes) for s in symbols.values())
         total_functions = sum(len(s.functions) for s in symbols.values())
         
+        # Check if this is a Python project
+        is_python_project = len(symbols) > 0
+        
+        if not is_python_project:
+            # Not a Python project - provide helpful guidance
+            return AnalysisResult(
+                business_domain="⚠️ No Python files detected in this project",
+                architecture_pattern="Non-Python Project",
+                core_modules=[{
+                    "module": "Project Type Detection",
+                    "purpose": "This appears to be a non-Python project",
+                    "key_components": [
+                        "ProjectOracle currently only supports Python projects",
+                        "Support for Java/Kotlin/JavaScript coming soon"
+                    ],
+                    "responsibilities": "Please use ProjectOracle on a Python project, or wait for multi-language support"
+                }],
+                data_flow="N/A - No Python files found",
+                entry_points=[],
+                fragile_points=[
+                    "This project contains no Python files",
+                    "ProjectOracle v1.0 only supports Python analysis",
+                    "Consider using language-specific tools for this project type"
+                ],
+                resolved_uncertain_imports={}
+            )
+        
         # Collect all imports
         internal_imports = set()
         external_imports = set()
