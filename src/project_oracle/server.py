@@ -23,7 +23,7 @@ from .utils import logger, setup_logging
 app = Server("project-oracle")
 
 # Setup logging
-setup_logging(level="DEBUG")
+setup_logging()
 
 
 @app.list_tools()
