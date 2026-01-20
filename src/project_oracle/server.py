@@ -212,7 +212,6 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         result = await asyncio.to_thread(
             analyze_project_sync,
             project_path,
-            project_path,
             force,
             max_files,
             dry_run,
