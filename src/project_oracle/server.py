@@ -7,7 +7,7 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent, Resource, ResourceTemplate
+from mcp.types import Tool, TextContent, Resource, ResourceTemplate, Prompt, PromptMessage, PromptArgument
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
@@ -125,6 +125,62 @@ async def read_resource(uri: str) -> str:
     content = parser.extract(file_path)
     
     return content.content
+
+
+@app.list_prompts()
+async def list_prompts() -> list[Prompt]:
+    """List available prompts."""
+    return [
+        Prompt(
+            name="analyze-architecture",
+            description="Analyze software architecture and design patterns",
+            arguments=[
+                PromptArgument(
+                    name="focus",
+                    description="Specific area to focus on (e.g. security, scalable, database)",
+                    required=False
+                )
+            ]
+        ),
+        Prompt(
+            name="security-audit",
+            description="Perform a security audit focus on vulnerabilities",
+            arguments=[]
+        )
+    ]
+
+
+@app.get_prompt()
+async def get_prompt(name: str, arguments: Any) -> Any:
+    """Get prompt template."""
+    if name == "analyze-architecture":
+        focus = arguments.get("focus", "general architecture")
+        return {
+            "messages": [
+                PromptMessage(
+                    role="user",
+                    content=TextContent(
+                        type="text",
+                        text=f"Please analyze the software architecture of this project, focusing on {focus}. Identify key components, data flow, and potential architectural bottlenecks."
+                    )
+                )
+            ]
+        }
+    
+    elif name == "security-audit":
+        return {
+            "messages": [
+                PromptMessage(
+                    role="user",
+                    content=TextContent(
+                        type="text",
+                        text="Perform a comprehensive security audit of this codebase. Look for common vulnerabilities such as hardcoded credentials, injection risks, insecure dependencies, and improper data handling."
+                    )
+                )
+            ]
+        }
+    
+    raise ValueError(f"Unknown prompt: {name}")
 
 
 @app.call_tool()
