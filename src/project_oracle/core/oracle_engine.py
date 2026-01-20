@@ -5,8 +5,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from anthropic import Anthropic, APITimeoutError
-
+from .llm_providers import BaseLLMProvider, NoLLMProvider
 from ..models import DirectoryTree, SymbolData, AnalysisResult, CostLimitExceeded
 from ..utils import logger
 
@@ -14,19 +13,17 @@ from ..utils import logger
 class OracleEngine:
     """Manages LLM analysis and report generation."""
     
-    def __init__(self, api_key: str, max_cost_usd: float = 0.50):
-        self.client = Anthropic(api_key=api_key)
-        self.max_cost_usd = max_cost_usd
+    def __init__(self, provider: Optional[BaseLLMProvider] = None, max_cost_usd: float = 0.50):
+        """
+        Initialize Oracle Engine.
         
-        # Claude 3.5 Sonnet pricing
-        self.input_price_per_1k = 0.003
-        self.output_price_per_1k = 0.015
-    
-    def estimate_cost(self, input_tokens: int, output_tokens: int = 2000) -> float:
-        """Estimate API cost."""
-        input_cost = (input_tokens / 1000) * self.input_price_per_1k
-        output_cost = (output_tokens / 1000) * self.output_price_per_1k
-        return input_cost + output_cost
+        Args:
+            provider: LLM provider instance (None for scan-only mode)
+            max_cost_usd: Maximum cost limit in USD
+        """
+        self.provider = provider or NoLLMProvider()
+        self.max_cost_usd = max_cost_usd
+        self.is_scan_only = isinstance(self.provider, NoLLMProvider)
     
     def estimate_input_tokens(self, tree_str: str, symbols: str, entry_point: str) -> int:
         """Rough token estimation (4 chars ≈ 1 token)."""
@@ -41,27 +38,28 @@ class OracleEngine:
         uncertain_imports: list[str],
         dry_run: bool = False
     ) -> AnalysisResult:
-        """Analyze project using LLM."""
+        """Analyze project using LLM or generate scan-only report."""
         
-        # Build prompt
+        # Build strings for estimation
         tree_str = tree.to_string()
         symbols_json = self._serialize_symbols(symbols)
         
         # Estimate cost
         estimated_tokens = self.estimate_input_tokens(tree_str, symbols_json, entry_point_content)
-        estimated_cost = self.estimate_cost(estimated_tokens)
+        estimated_cost = self.provider.estimate_cost(estimated_tokens)
         
+        logger.info(f"Provider: {self.provider.name}")
         logger.info(f"Estimated tokens: {estimated_tokens}, cost: ${estimated_cost:.4f}")
         
-        # Cost protection
-        if estimated_cost > self.max_cost_usd:
+        # Cost protection (skip for free providers)
+        if estimated_cost > 0 and estimated_cost > self.max_cost_usd:
             raise CostLimitExceeded(
                 f"Estimated cost ${estimated_cost:.4f} exceeds limit ${self.max_cost_usd:.2f}"
             )
         
         if dry_run:
             return AnalysisResult(
-                business_domain=f"[DRY RUN] Estimated cost: ${estimated_cost:.4f}",
+                business_domain=f"[DRY RUN] Provider: {self.provider.name}, Estimated cost: ${estimated_cost:.4f}",
                 architecture_pattern="N/A",
                 core_modules=[],
                 data_flow="N/A",
@@ -72,33 +70,60 @@ class OracleEngine:
                 estimated_tokens=estimated_tokens
             )
         
-        # Build and send prompt
+        # Scan-only mode
+        if self.is_scan_only:
+            return self._generate_scan_only_analysis(tree, symbols, uncertain_imports)
+        
+        # LLM analysis
         prompt = self._build_prompt(tree_str, symbols_json, entry_point_content, uncertain_imports)
         
         try:
-            response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=4000,
-                temperature=0.3,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            
-            # Log actual cost
-            actual_cost = self.estimate_cost(
-                response.usage.input_tokens,
-                response.usage.output_tokens
-            )
-            logger.info(f"Actual cost: ${actual_cost:.4f}")
-            
-            # Parse response
-            return self._parse_response(response.content[0].text)
-        
-        except APITimeoutError:
-            logger.error("LLM API timeout")
-            return self._fallback_analysis()
+            response_text = self.provider.analyze(prompt)
+            return self._parse_response(response_text)
         except Exception as e:
             logger.error(f"LLM analysis failed: {e}")
             return self._fallback_analysis()
+    
+    def _generate_scan_only_analysis(
+        self,
+        tree: DirectoryTree,
+        symbols: Dict[str, SymbolData],
+        uncertain_imports: list[str]
+    ) -> AnalysisResult:
+        """Generate basic analysis without LLM (scan-only mode)."""
+        
+        # Count symbols
+        total_classes = sum(len(s.classes) for s in symbols.values())
+        total_functions = sum(len(s.functions) for s in symbols.values())
+        
+        # Collect all imports
+        internal_imports = set()
+        external_imports = set()
+        
+        for symbol_data in symbols.values():
+            internal_imports.update(symbol_data.imports.internal_confirmed)
+            external_imports.update(symbol_data.imports.external_confirmed)
+        
+        # Generate basic description
+        business_domain = f"Python project with {total_classes} classes and {total_functions} functions"
+        
+        return AnalysisResult(
+            business_domain=business_domain,
+            architecture_pattern="Scan-Only Mode (Enable LLM for detailed analysis)",
+            core_modules=[{
+                "module": "Project Overview",
+                "purpose": "Basic scan completed - use --llm-provider for AI analysis",
+                "key_components": [f"{len(symbols)} files scanned"],
+                "responsibilities": f"Contains {total_classes} classes, {total_functions} functions"
+            }],
+            data_flow="Enable LLM analysis to generate data flow diagram",
+            entry_points=list(symbols.keys())[:5] if symbols else [],
+            fragile_points=[
+                "Scan-only mode provides limited insights",
+                f"{len(uncertain_imports)} uncertain imports need LLM classification"
+            ],
+            resolved_uncertain_imports={}
+        )
     
     def _build_prompt(self, tree: str, symbols: str, entry_point: str, uncertain: list[str]) -> str:
         """Build analysis prompt."""
@@ -216,16 +241,21 @@ CRITICAL: Only mention components found in the symbols list. Be accurate, not cr
         return json.dumps(result, indent=2)
     
     def generate_report(self, analysis: AnalysisResult, stats: dict, project_name: str) -> str:
-        """Generate Markdown report.
-
-"""
+        """Generate Markdown report."""
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+        
+        # Determine analysis mode
+        mode_info = ""
+        if self.is_scan_only:
+            mode_info = "\n> **Mode**: Scan-Only (No LLM) - For AI analysis, use --llm-provider"
+        else:
+            mode_info = f"\n> **LLM Provider**: {self.provider.name}"
         
         report = f"""# 🔮 ProjectOracle Report
 
 > **Generated**: {now}  
 > **Project**: {project_name}
-> **Analyzer Version**: 1.0.0
+> **Analyzer Version**: 1.0.0{mode_info}
 
 ---
 

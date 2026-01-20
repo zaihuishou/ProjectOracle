@@ -7,19 +7,38 @@ from pathlib import Path
 import click
 
 from .core import Scanner, PythonParser, OracleEngine, ConfigManager
+from .core.llm_providers import create_provider
 from .utils import logger, setup_logging
 
 
 @click.command()
 @click.argument('project_path', type=click.Path(exists=True))
 @click.option('--interactive', '-i', is_flag=True, help='Interactive configuration mode')
+@click.option('--scan-only', is_flag=True, help='Scan-only mode (FREE - no API key needed)')
+@click.option('--llm-provider', 
+              type=click.Choice(['anthropic', 'openai', 'ollama', 'none'], case_sensitive=False),
+              default='anthropic',
+              help='LLM provider (anthropic/openai/ollama/none)')
+@click.option('--llm-model', help='LLM model name (provider-specific)')
 @click.option('--dry-run', is_flag=True, help='Preview cost without analyzing')
 @click.option('--force', '-f', is_flag=True, help='Force regeneration')
 @click.option('--max-files', default=5000, help='Max files to analyze')
 @click.option('--max-cost', default=0.50, type=float, help='Max LLM cost in USD')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose logging')
-def main(project_path, interactive, dry_run, force, max_files, max_cost, verbose):
-    """Analyze a project and generate .ProjectOracle report."""
+def main(project_path, interactive, scan_only, llm_provider, llm_model,
+         dry_run, force, max_files, max_cost, verbose):
+    """Analyze a project and generate .ProjectOracle report.
+    
+    \b
+    Examples:
+      # FREE modes (no API key needed):
+      project-oracle /path/to/project --scan-only
+      project-oracle /path/to/project --llm-provider ollama
+      
+      # Paid modes:
+      project-oracle /path/to/project --llm-provider anthropic
+      project-oracle /path/to/project --llm-provider openai
+    """
     
     # Setup logging
     log_level = "DEBUG" if verbose else "INFO"
@@ -27,13 +46,28 @@ def main(project_path, interactive, dry_run, force, max_files, max_cost, verbose
     
     project_path = Path(project_path).resolve()
     
+    # Scan-only implies none provider
+    if scan_only:
+        llm_provider = 'none'
+    
     # Interactive prompts
     if interactive:
         click.echo("\n🔮 ProjectOracle Interactive Mode\n")
         project_path = click.prompt('Project root path', default=str(project_path), type=click.Path(exists=True))
         project_path = Path(project_path)
         max_files = click.prompt('Max files to analyze', default=5000, type=int)
-        max_cost = click.prompt('Max LLM cost (USD)', default=0.50, type=float)
+        
+        llm_provider = click.prompt(
+            'LLM provider',
+            type=click.Choice(['anthropic', 'openai', 'ollama', 'none']),
+            default='anthropic'
+        )
+        
+        if llm_provider == 'ollama':
+            llm_model = click.prompt('Ollama model', default='llama2')
+        elif llm_provider in ['anthropic', 'openai']:
+            max_cost = click.prompt('Max LLM cost (USD)', default=0.50, type=float)
+        
         force = click.confirm('Force regenerate?', default=False)
         dry_run = click.confirm('Dry run only?', default=False)
     
@@ -44,15 +78,33 @@ def main(project_path, interactive, dry_run, force, max_files, max_cost, verbose
         "llm": {"max_cost_usd": max_cost}
     })
     
-    # Check API key
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key and not dry_run:
-        click.echo("❌ Error: ANTHROPIC_API_KEY environment variable not set", err=True)
-        click.echo("   Set it with: export ANTHROPIC_API_KEY=your-key-here")
-        sys.exit(1)
+    # Get API key based on provider
+    api_key = None
+    if llm_provider == 'anthropic':
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key and not dry_run:
+            click.echo("❌ Error: ANTHROPIC_API_KEY environment variable not set", err=True)
+            click.echo("   Set it with: export ANTHROPIC_API_KEY=your-key-here")
+            click.echo("\n💡 TIP: Use --scan-only or --llm-provider ollama for FREE analysis", err=True)
+            sys.exit(1)
+    elif llm_provider == 'openai':
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key and not dry_run:
+            click.echo("❌ Error: OPENAI_API_KEY environment variable not set", err=True)
+            click.echo("   Set it with: export OPENAI_API_KEY=your-key-here")
+            click.echo("\n💡 TIP: Use --scan-only or --llm-provider ollama for FREE analysis", err=True)
+            sys.exit(1)
+    elif llm_provider == 'ollama':
+        click.echo("💡 Using Ollama (local LLM) - FREE!")
+        click.echo("   Make sure Ollama is running: ollama serve")
+        if llm_model:
+            click.echo(f"   Using model: {llm_model}")
+            click.echo(f"   If not downloaded: ollama pull {llm_model}\n")
+    elif llm_provider == 'none':
+        click.echo("💡 Scan-only mode - FREE! No AI analysis, basic report only\n")
     
     # Initialize components
-    click.echo("\n🔍 Scanning project...\n")
+    click.echo("🔍 Scanning project...\n")
     
     scanner = Scanner(
         str(project_path),
@@ -67,30 +119,20 @@ def main(project_path, interactive, dry_run, force, max_files, max_cost, verbose
     click.echo(f"  • Total files found: {stats.total_files:,}")
     click.echo(f"  • Files to analyze: {stats.included_files:,}")
     click.echo(f"  • Strategy: {stats.strategy}")
-    click.echo(f"  • Estimated time: ~{stats.estimated_seconds}s")
-    
-    # Rough cost estimation
-    estimated_cost = min(stats.included_files * 0.0001, max_cost)
-    click.echo(f"  • Estimated cost: ~${estimated_cost:.4f} USD\n")
+    click.echo(f"  • Estimated time: ~{stats.estimated_seconds}s\n")
     
     if dry_run:
         click.echo("✅ Dry run complete (no changes made)")
         return
     
-    # Confirm before proceeding
-    if estimated_cost > max_cost * 0.8:
-        click.echo(f"⚠️  WARNING: Approaching cost limit ${max_cost:.2f}")
-        if not click.confirm('Continue anyway?'):
-            click.echo("Aborted.")
-            return
-    
+    # Confirm before proceeding for large projects
     if not force and stats.included_files > 1000:
-        if not click.confirm(f'\nAnalyze {stats.included_files:,} files?'):
+        if not click.confirm(f'Analyze {stats.included_files:,} files?'):
             click.echo("Aborted.")
             return
     
     # Run analysis
-    click.echo("\n🚀 Starting analysis...\n")
+    click.echo("🚀 Starting analysis...\n")
     
     try:
         # Scan and extract
@@ -126,10 +168,27 @@ def main(project_path, interactive, dry_run, force, max_files, max_cost, verbose
         for sym_data in symbols.values():
             uncertain.update(sym_data.imports.uncertain)
         
-        # Analyze
-        click.echo("\n🤖 Analyzing with LLM...")
+        # Create provider
+        try:
+            provider = create_provider(
+                provider_name=llm_provider,
+                api_key=api_key,
+                model=llm_model
+            )
+        except ImportError as e:
+            click.echo(f"\n❌ Error: {e}", err=True)
+            sys.exit(1)
+        except ValueError as e:
+            click.echo(f"\n❌ Error: {e}", err=True)
+            sys.exit(1)
         
-        engine = OracleEngine(api_key=api_key, max_cost_usd=max_cost)
+        # Analyze
+        if llm_provider == 'none':
+            click.echo("\n📋 Generating scan-only report...")
+        else:
+            click.echo(f"\n🤖 Analyzing with {provider.name}...")
+        
+        engine = OracleEngine(provider=provider, max_cost_usd=max_cost)
         analysis = engine.analyze_project(
             tree=tree,
             symbols=symbols,
@@ -167,7 +226,12 @@ def main(project_path, interactive, dry_run, force, max_files, max_cost, verbose
         click.echo(f"  • Files scanned: {stats.total_files:,}")
         click.echo(f"  • Files analyzed: {stats.included_files:,}")
         click.echo(f"  • Classes found: {total_classes}")
-        click.echo(f"  • Functions found: {total_functions}\n")
+        click.echo(f"  • Functions found: {total_functions}")
+        
+        if llm_provider == 'none':
+            click.echo(f"\n💡 For AI-powered analysis, use:")
+            click.echo(f"   --llm-provider anthropic  (paid)")
+            click.echo(f"   --llm-provider ollama     (free, local)")
     
     except KeyboardInterrupt:
         click.echo("\n\n⚠️  Analysis interrupted by user")
