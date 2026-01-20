@@ -194,13 +194,14 @@ def analyze_project_sync(
     output_dir = project_path / ".ProjectOracle"
     output_dir.mkdir(exist_ok=True)
     
-    # Generate report filename: project_name_analysis.md
-    report_filename = f"{project_path.name}_analysis.md"
+    # Generate report filename: project_name_analysis.md (use resolve().name for actual dir name)
+    project_name = project_path.resolve().name
+    report_filename = f"{project_name}_analysis.md"
     output_path = output_dir / report_filename
     
     # Backup if exists
     if output_path.exists() and not force:
-        backup_path = output_dir / f"{project_path.name}_analysis.backup.md"
+        backup_path = output_dir / f"{project_name}_analysis.backup.md"
         output_path.rename(backup_path)
     
     output_path.write_text(report, encoding='utf-8')

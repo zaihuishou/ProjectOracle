@@ -224,13 +224,14 @@ def main(project_path, force, max_files, verbose):
         output_dir = project_path / ".ProjectOracle"
         output_dir.mkdir(exist_ok=True)
         
-        # 生成报告文件名: 项目名_analysis.md
-        report_filename = f"{project_path.name}_analysis.md"
+        # 生成报告文件名: 项目名_analysis.md (使用resolve().name获取实际目录名)
+        project_name = project_path.resolve().name
+        report_filename = f"{project_name}_analysis.md"
         output_path = output_dir / report_filename
         
         # 备份旧报告
         if output_path.exists() and not force:
-            backup_path = output_dir / f"{project_path.name}_analysis.backup.md"
+            backup_path = output_dir / f"{project_name}_analysis.backup.md"
             output_path.rename(backup_path)
             click.echo(f"  📦 Backed up old report to: {backup_path.name}")
         
