@@ -173,15 +173,17 @@ class Scanner:
                 
                 # Check extension
                 if not any(filename.endswith(ext) for ext in extensions):
+                    # logger.debug(f"Skipping extension mismatch: {filename}")
                     continue
                 
                 # Check if ignored
                 if self._is_ignored(file_path):
+                    logger.debug(f"Skipping ignored file: {file_path}")
                     continue
                 
                 # Check if sensitive
                 if self._is_sensitive_file(file_path):
-                    logger.debug(f"Skipping sensitive file: {file_path}")
+                    logger.warning(f"!!! Skipping SENSITIVE file: {file_path} !!!")
                     continue
                 
                 # Check file size (skip > 500KB)
